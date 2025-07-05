@@ -10,7 +10,7 @@ import plotly.express as px
 from supabase import create_client, Client
 
 # Supabase credentials
-SUPABASE_URL = "https://elanyyvekehahxslujkj.supabase.cohttps://elanyyvekehahxslujkj.supabase.co"  # Replace with your Supabase URL
+SUPABASE_URL = "https://elanyyvekehahxslujkj.supabase.co"  # Replace with your Supabase URL
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsYW55eXZla2VoYWh4c2x1amtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MzUwOTQsImV4cCI6MjA2NzMxMTA5NH0.8GxojDJIdniKcfR00rfB5vvMCCMq7Qrznms2omrv5VE"  # Replace with your Supabase anon/public key
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
