@@ -1,4 +1,4 @@
-# Material Specification Web App - Full Streamlit Code with Supabase Integration
+# Material Specification Web App - Streamlit + Supabase Fully Integrated
 
 import streamlit as st
 import pandas as pd
@@ -10,11 +10,11 @@ import plotly.express as px
 from supabase import create_client, Client
 
 # Supabase credentials
-SUPABASE_URL = "https://elanyyvekehahxslujkj.supabase.co"  # Replace with your Supabase URL
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsYW55eXZla2VoYWh4c2x1amtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MzUwOTQsImV4cCI6MjA2NzMxMTA5NH0.8GxojDJIdniKcfR00rfB5vvMCCMq7Qrznms2omrv5VE"  # Replace with your Supabase anon/public key
+SUPABASE_URL = "https://elanyyvekehahxslujkj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsYW55eXZla2VoYWh4c2x1amtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MzUwOTQsImV4cCI6MjA2NzMxMTA5NH0.8GxojDJIdniKcfR00rfB5vvMCCMq7Qrznms2omrv5VE"  # Replace with your actual anon key
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Paths
+# Constants
 IMAGE_DIR = 'uploaded_images'
 LOGO_PATH = 'Artboard 2.png'
 
@@ -58,7 +58,7 @@ def load_data():
 def save_data(entry):
     supabase.table("materials").insert(entry).execute()
 
-# Tabs
+# Sidebar navigation
 page = st.sidebar.selectbox("Navigate", ["Add Material", "View Report", "Analytics Dashboard", "Project Dashboard"])
 
 data = load_data()
@@ -118,4 +118,74 @@ if page == "Add Material":
             save_data(entry)
             st.success("✅ Material specification saved to Supabase!")
 
-# Remaining pages (View Report, Analytics, Project Dashboard) remain unchanged but should work off 'data' variable
+elif page == "View Report":
+    st.subheader("📑 Material Report Viewer")
+    if not data.empty:
+        st.markdown("### 🔍 Search & Filter")
+        search = st.text_input("Search by keyword (any column):")
+        project_filter = st.selectbox("Filter by Project", options=["All"] + sorted(data['Project Name'].dropna().unique().tolist()))
+        category_filter = st.selectbox("Filter by Category", options=["All"] + sorted(data['Material Category'].dropna().unique().tolist()))
+        supplier_filter = st.selectbox("Filter by Supplier", options=["All"] + sorted(data['Supplier Name / Contact'].dropna().unique().tolist()))
+
+        filtered = data.copy()
+        if search:
+            filtered = filtered[filtered.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)]
+        if project_filter != "All":
+            filtered = filtered[filtered['Project Name'] == project_filter]
+        if category_filter != "All":
+            filtered = filtered[filtered['Material Category'] == category_filter]
+        if supplier_filter != "All":
+            filtered = filtered[filtered['Supplier Name / Contact'] == supplier_filter]
+
+        st.dataframe(filtered, use_container_width=True)
+
+        if not filtered.empty:
+            selected_index = st.number_input("Row to Export (starts from 0):", min_value=0, max_value=len(filtered)-1)
+            if st.button("📄 Export Selected Entry to PDF"):
+                single_entry = filtered.iloc[[selected_index]]
+                output_path = f"entry_{selected_index}.pdf"
+                export_to_pdf(single_entry, output_path, logo_path=LOGO_PATH)
+                with open(output_path, "rb") as f:
+                    st.download_button("Download PDF", data=f, file_name=output_path)
+            if st.button("📂 Export All Filtered Entries to PDF"):
+                output_path = "filtered_entries.pdf"
+                export_to_pdf(filtered, output_path, logo_path=LOGO_PATH)
+                with open(output_path, "rb") as f:
+                    st.download_button("Download All PDFs", data=f, file_name=output_path)
+
+elif page == "Analytics Dashboard":
+    st.subheader("📊 Analytics Dashboard")
+    if not data.empty:
+        col1, col2 = st.columns(2)
+        with col1:
+            fig1 = px.histogram(data, x="Material Category", title="Material Count by Category")
+            st.plotly_chart(fig1, use_container_width=True)
+            fig3 = px.histogram(data, x="Supplier Name / Contact", title="Top Suppliers by Count")
+            st.plotly_chart(fig3, use_container_width=True)
+        with col2:
+            fig2 = px.histogram(data, x="Project Name", title="Materials per Project")
+            st.plotly_chart(fig2, use_container_width=True)
+            fig4 = px.histogram(data, x="Country of Origin", title="Origin Country Distribution")
+            st.plotly_chart(fig4, use_container_width=True)
+    else:
+        st.warning("Not enough data to show analytics.")
+
+elif page == "Project Dashboard":
+    st.subheader("📁 Project Dashboard")
+    if not data.empty:
+        all_projects = sorted(data['Project Name'].dropna().unique())
+        selected_project = st.selectbox("Select a Project to View", options=all_projects)
+        project_data = data[data['Project Name'] == selected_project]
+        st.markdown(f"### 🗂️ {selected_project} - {len(project_data)} Material(s)")
+        st.dataframe(project_data, use_container_width=True)
+        if st.button("📄 Export This Project to PDF"):
+            output_path = f"project_{selected_project.replace(' ', '_')}.pdf"
+            export_to_pdf(project_data, output_path, logo_path=LOGO_PATH)
+            with open(output_path, "rb") as f:
+                st.download_button("Download Project PDF", data=f, file_name=output_path)
+        with st.expander("📸 View Project Images"):
+            for _, row in project_data.iterrows():
+                if isinstance(row["Image Path"], str) and os.path.exists(row["Image Path"]):
+                    st.image(row["Image Path"], caption=row["Material/Item Name"], width=200)
+    else:
+        st.info("No project data available.")
